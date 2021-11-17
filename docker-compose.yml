@@ -1,0 +1,12 @@
+version: "2"
+
+services:
+  xiaoniu_socketio_server:
+    build: "./"
+    volumes:
+      - /home/www/xiaoniu_socketio_server:/home
+    ports:
+      - "2120:2120"
+      - "2121:2121"
+    command: "php /home/start.php start"
+    restart: always

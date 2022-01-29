@@ -13,6 +13,8 @@
 
 * 未授权，则无法接收推送信息，断掉链接
 
+* 支持链接，失去链接事件的回调
+
 * 数据安全，简单操作
 
 * Docker 一键安装，方便使用
@@ -21,6 +23,15 @@
 
 ### 更新记录
 
+
+#### 2022-01-29
+
+祝大家新年快乐！
+
+* 增加socket push,join事件！
+* 登录，加入房间，有所调整！
+* 增加登录，失去链接回调
+* 优化一些BUG,使系统更健壮！
 
 #### 2021-11-17
 
@@ -36,52 +47,24 @@
 `防火墙记得放行`
 
 ## 配置
-config.json
+config.example.json 拷贝一份 `config.json` 进行修改
+
+`配置参考`
 
 ```json
 {
   "clients": {
-    "demo(这个key就是client_id)":{
+    "demo":{
       "api_key": "demo",
-      "aes_key": "698d51a19d8a121ce581499d7b701668（如果为空，证明不加密）"
-    },
-    "demo2":{
-      "api_key": "demo2",
-      "aes_key": "698d51a19d8a121ce581499d7b701669"
+      "aes_key": "698d51a19d8a121ce581499d7b701668",
+      "login_cb": "http://127.0.0.1:6010/?a=1",
+      "disconnect_cb": "http://127.0.0.1:6010/?a=2"
     }
   },
-  "origins": "*:*(多个域名 空格隔开)",
-  "sock_port": 2020,
-  "http_port": 2021
+  "origins": "*:*",
+  "sock_port": 2120,
+  "http_port": 2121
 }
-```
-
-## 前端实现
-
-```javascript
-    // 连接服务端 端口 是 2120 （可自定义）
-    var socket = io('http://'+document.domain+':2120');
-
-    // 连接后登录
-    socket.on('connect', function(){
-    	socket.emit('login', {'client_id':'{客户端id配置里面设置，一一对应}','room':'{推送房间，自定义}','time_stamp':'{当前时间戳}','sign':'{签名规则见下面}'});
-    });
-
-    // sign = md5(client_id={客户端ID,配置里面}&&room={推送的房间}&&time_stamp={当前时间戳}&&api_key={配置里面找})
-
-    // 后端推送来消息时 事件可自定义
-    socket.on('message', function(msg){
-         // {data: "1", is_online: true} data 就是http请求的content  is_online 是否是在线数据
-         if(typeof msg == "object") {
-             // 后台推送的数据
-             // 如果 配置有填aes_key data会是个加密的字符串 需自行解密            
-             if (msg['data']) {
-                  msg = Decrypt(msg['data'])
-             }
-         }else {
-            // 授权如果有失败 会返回字符串
-         }
-    });
 ```
 
 ## API推送
@@ -96,14 +79,160 @@ config.json
 
 * client_id 客户端（设备）ID 跟配置一一对应  如果没配置请求是不通的，必填
 
-* content: 推送的内容，必填
+* content 推送的内容，必填
 
-* event: 推送客户端的事件,不填默认 `message`
+* event 推送客户端的事件,不填默认 `message`
 
-* room: 对应的房间号 不填 默认全部
+* room 对应的房间号 不填 默认全部
 
 * is_save_offline 用户离线是否离线推送 1是 0否 默认 0
 
+socket 推送示例
+
+```json
+{
+  "datas": "推送的内容",
+  "is_online": true // 是否在线数据 或者离线数据
+}
+```
+
+返回示例：
+```json
+{
+  "errcode": 0,
+  "errmsg": "ok"
+}
+```
+## 后台socket事件
+
+#### 事件名：login 
+
+>  用户登录,当socket链接成功后，30秒内如果没登录，就会被断掉链接。
+
+##### 参数
+
+* client_id 设备id
+
+* time_stamp 当前时间戳（秒）
+
+* nonce_str 随机字符串
+
+* sign 签名 见下文
+
+#### 事件名：join 
+
+>  加入房间
+
+##### 参数
+
+* room 房间名称
+
+* client_id 设备id
+
+* time_stamp 当前时间戳（秒）
+
+* nonce_str 随机字符串
+
+* sign 签名 见下文
+
+#### 事件名：push 
+
+>  向房间推送信息
+
+##### 参数
+
+* room 房间名称 ，可为空。传空推送所有
+
+* datas 数据 字符串 可传普通字符串，可传json字符串 
+
+* event 对应接收事件 默认 `message`
+
+* client_id 设备id
+
+* time_stamp 当前时间戳（秒）
+
+* nonce_str 随机字符串
+
+* sign 签名 见下文
+
+## 前端实现
+
+```javascript
+    // 连接服务端 端口 是 2120 （可自定义）
+    var socket = io('http://'+document.domain+':2120');
+
+    // 连接后登录
+    socket.on('connect', function(){
+    	socket.emit('login', {所需参数见上文});
+    });
+    
+    // 后端推送来消息时 事件根据api自定义
+    socket.on('message', function(msg){
+         // {data: "1", is_online: true} data 就是http请求的content  is_online 是否是在线数据
+         if(typeof msg == "object") {
+             // 后台推送的数据
+             // 如果 配置有填aes_key data会是个加密的字符串 需自行解密            
+             if (msg['data']) {
+                  msg = Decrypt(msg['data'])
+             }
+         }
+    });
+
+    // 返回内容 {type:'login',errcode:0,errmsg:'ok'}
+    // type 返回的类型 login join push
+    // errcode 0 代表成功 不等于代表有误 详情看errmsg
+    // 登录成功会返回data {sid:'socket的sid'}
+    socket.on('server_return',function (ret) {
+        console.log(ret)
+        var types = ret['type'];
+        switch (types) {
+            case 'login':
+              if (ret['errcode'] == 0) {
+                // 登录成功
+              }else {
+                  //登录失败 失败看 ret['errmsg']
+              }
+              break
+            case 'join':
+              if (ret['errcode'] == 0) {
+                // 加入房间成功
+              }else {
+                // 加入房间失败
+              }
+          }
+        })
+```
+
+### 鉴权须知（sign生成规则）
+
+`以下参数，api_key值都是用来做demo测试用的！！`
+
+`以下参数，api_key值都是用来做demo测试用的！！`
+
+`以下参数，api_key值都是用来做demo测试用的！！`
+
+**假如**你请求的参数有：
+
+```
+参数 username 值等于 taiyouqu
+参数 password 值等于 123456
+```
+
+api_key 值等于 `aaabbb`
+
+加密规则：
+
+①、对参数按照key=value的格式，并按照参数名ASCII字典序排序如下：
+```
+password=123456&&username=taiyouqu
+```
+②、拼接api_key密钥：
+以上结果:
+```
+password=123456&&username=taiyouqu&&api_key=aaabbb
+```
+③、 md5('第②步结果')
+`sign = 0a243d3055e90663d4411ca49c6f3852`（**统一小写**）
 
 ## 常规部署
 

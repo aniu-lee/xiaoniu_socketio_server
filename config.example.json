@@ -1,0 +1,13 @@
+{
+  "clients": {
+    "demo(client_id)":{
+      "api_key": "demo（通常32位）",
+      "aes_key": "698d51a19d8a121ce581499d7b701668(必须32位随机字符串)",
+      "login_cb": "登录成功回调地址，如果为空就不回调",
+      "disconnect_cb": "socket失去链接回调地址，如果为空不回调"
+    }
+  },
+  "origins": "*:*",
+  "sock_port": 2120, // 可自定义
+  "http_port": 2121 // 可自定义
+}
